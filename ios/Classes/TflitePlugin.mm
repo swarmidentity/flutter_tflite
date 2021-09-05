@@ -71,10 +71,15 @@ void close();
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-  if ([@"loadModel" isEqualToString:call.method]) {
+  if ([@"loadImageClassificationModel" isEqualToString:call.method]) {
     NSString* load_result = loadModel(_registrar, call.arguments);
     result(load_result);
-  } else if ([@"runModelOnImage" isEqualToString:call.method]) {
+  }  //TODO: For iOS, add 2 separate classes
+  else if ([@"loadObjectRecognitionModel" isEqualToString:call.method]) {
+           NSString* load_result = loadModel(_registrar, call.arguments);
+           result(load_result);
+  }
+    else if ([@"runModelOnImage" isEqualToString:call.method]) {
     runModelOnImage(call.arguments, result);
   } else if ([@"runModelOnBinary" isEqualToString:call.method]) {
     runModelOnBinary(call.arguments, result);

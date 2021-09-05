@@ -54,7 +54,8 @@ import java.util.Vector;
 
 public class TflitePlugin implements MethodCallHandler {
   private final Registrar mRegistrar;
-  private Interpreter tfLite;
+  private Interpreter tfLiteObjectRecognition;
+  private Interpreter tfLiteImageClassification;
   private boolean tfLiteBusy = false;
   private int inputSize = 0;
   private Vector<String> labels;
@@ -93,9 +94,17 @@ public class TflitePlugin implements MethodCallHandler {
 
   @Override
   public void onMethodCall(MethodCall call, Result result) {
-    if (call.method.equals("loadModel")) {
+    if (call.method.equals("loadObjectRecognitionModel")) {
       try {
-        String res = loadModel((HashMap) call.arguments);
+        String res = loadObjectRecognitionModel((HashMap) call.arguments);
+        result.success(res);
+      } catch (Exception e) {
+        result.error("Failed to load model", e.getMessage(), e);
+      }
+    }
+    else if (call.method.equals("loadImageClassificationModel")) {
+      try {
+        String res = loadImageClassificationModel((HashMap) call.arguments);
         result.success(res);
       } catch (Exception e) {
         result.error("Failed to load model", e.getMessage(), e);
@@ -197,7 +206,15 @@ public class TflitePlugin implements MethodCallHandler {
     }
   }
 
-  private String loadModel(HashMap args) throws IOException {
+    private String loadImageClassificationModel(HashMap args) throws IOException {
+        return loadModel(args, tfLiteImageClassification);
+    }
+
+    private String loadObjectRecognitionModel(HashMap args) throws IOException {
+        return loadModel(args, tfLiteObjectRecognition);
+    }
+
+  private String loadModel(HashMap args, Interpreter tflite) throws IOException {
     String model = args.get("model").toString();
     Object isAssetObj = args.get("isAsset");
     boolean isAsset = isAssetObj == null ? false : (boolean) isAssetObj;
@@ -300,7 +317,7 @@ public class TflitePlugin implements MethodCallHandler {
   }
 
   Bitmap feedOutput(ByteBuffer imgData, float mean, float std) {
-    Tensor tensor = tfLite.getOutputTensor(0);
+    Tensor tensor = tfLiteObjectRecognition.getOutputTensor(0);
     int outputSize = tensor.shape()[1];
     Bitmap bitmapRaw = Bitmap.createBitmap(outputSize, outputSize, Bitmap.Config.ARGB_8888);
 
@@ -329,7 +346,7 @@ public class TflitePlugin implements MethodCallHandler {
   }
 
   ByteBuffer feedInputTensor(Bitmap bitmapRaw, float mean, float std) throws IOException {
-    Tensor tensor = tfLite.getInputTensor(0);
+    Tensor tensor = tfLiteObjectRecognition.getInputTensor(0);
     int[] shape = tensor.shape();
     inputSize = shape[1];
     int inputChannels = shape[3];
@@ -501,7 +518,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(input, labelProb);
+      tfLiteImageClassification.run(input, labelProb);
     }
 
     protected void onRunTfliteDone() {
@@ -527,7 +544,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(imgData, labelProb);
+      tfLiteImageClassification.run(imgData, labelProb);
     }
 
     protected void onRunTfliteDone() {
@@ -562,7 +579,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(imgData, labelProb);
+      tfLiteImageClassification.run(imgData, labelProb);
     }
 
     protected void onRunTfliteDone() {
@@ -654,7 +671,7 @@ public class TflitePlugin implements MethodCallHandler {
 
     RunSSDMobileNet(HashMap args, ByteBuffer imgData, int numResultsPerClass, float threshold, Result result) {
       super(args, result);
-      this.num = tfLite.getOutputTensor(0).shape()[1];
+      this.num = tfLiteObjectRecognition.getOutputTensor(0).shape()[1];
       this.numResultsPerClass = numResultsPerClass;
       this.threshold = threshold;
       this.outputLocations = new float[1][num][4];
@@ -671,7 +688,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
+      tfLiteObjectRecognition.runForMultipleInputsOutputs(inputArray, outputMap);
     }
 
     protected void onRunTfliteDone() {
@@ -747,7 +764,7 @@ public class TflitePlugin implements MethodCallHandler {
       this.numResultsPerClass = numResultsPerClass;
       this.startTime = SystemClock.uptimeMillis();
 
-      Tensor tensor = tfLite.getInputTensor(0);
+      Tensor tensor = tfLiteObjectRecognition.getInputTensor(0);
       inputSize = tensor.shape()[1];
 
       this.gridSize = inputSize / blockSize;
@@ -756,7 +773,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(imgData, output);
+      tfLiteObjectRecognition.run(imgData, output);
     }
 
     protected void onRunTfliteDone() {
@@ -875,7 +892,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -921,7 +938,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -970,7 +987,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -1011,12 +1028,12 @@ public class TflitePlugin implements MethodCallHandler {
 
       startTime = SystemClock.uptimeMillis();
       input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
-      output = ByteBuffer.allocateDirect(tfLite.getOutputTensor(0).numBytes());
+      output = ByteBuffer.allocateDirect(tfLiteObjectRecognition.getOutputTensor(0).numBytes());
       output.order(ByteOrder.nativeOrder());
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -1051,12 +1068,12 @@ public class TflitePlugin implements MethodCallHandler {
 
       startTime = SystemClock.uptimeMillis();
       input = ByteBuffer.wrap(binary);
-      output = ByteBuffer.allocateDirect(tfLite.getOutputTensor(0).numBytes());
+      output = ByteBuffer.allocateDirect(tfLiteObjectRecognition.getOutputTensor(0).numBytes());
       output.order(ByteOrder.nativeOrder());
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -1098,12 +1115,12 @@ public class TflitePlugin implements MethodCallHandler {
 
       startTime = SystemClock.uptimeMillis();
       input = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
-      output = ByteBuffer.allocateDirect(tfLite.getOutputTensor(0).numBytes());
+      output = ByteBuffer.allocateDirect(tfLiteObjectRecognition.getOutputTensor(0).numBytes());
       output.order(ByteOrder.nativeOrder());
     }
 
     protected void runTflite() {
-      tfLite.run(input, output);
+      tfLiteObjectRecognition.run(input, output);
     }
 
     protected void onRunTfliteDone() {
@@ -1125,7 +1142,7 @@ public class TflitePlugin implements MethodCallHandler {
 
 
   byte[] fetchArgmax(ByteBuffer output, List<Number> labelColors, String outputType) {
-    Tensor outputTensor = tfLite.getOutputTensor(0);
+    Tensor outputTensor = tfLiteObjectRecognition.getOutputTensor(0);
     int outputBatchSize = outputTensor.shape()[0];
     assert outputBatchSize == 1;
     int outputHeight = outputTensor.shape()[1];
@@ -1257,8 +1274,8 @@ public class TflitePlugin implements MethodCallHandler {
       }
     }
 
-    for (int i = 0; i < tfLite.getOutputTensorCount(); i++) {
-      int[] shape = tfLite.getOutputTensor(i).shape();
+    for (int i = 0; i < tfLiteObjectRecognition.getOutputTensorCount(); i++) {
+      int[] shape = tfLiteObjectRecognition.getOutputTensor(i).shape();
       float[][][][] output = new float[shape[0]][shape[1]][shape[2]][shape[3]];
       outputMap.put(i, output);
     }
@@ -1293,7 +1310,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLite.runForMultipleInputsOutputs(input, outputMap);
+      tfLiteObjectRecognition.runForMultipleInputsOutputs(input, outputMap);
     }
 
     protected void onRunTfliteDone() {
@@ -1578,8 +1595,10 @@ public class TflitePlugin implements MethodCallHandler {
   }
 
   private void close() {
-    if (tfLite != null)
-      tfLite.close();
+    if (tfLiteObjectRecognition != null)
+      tfLiteObjectRecognition.close();
+    if (tfLiteImageClassification != null)
+      tfLiteImageClassification.close();
     labels = null;
     labelProb = null;
   }
