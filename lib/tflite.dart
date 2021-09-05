@@ -4,7 +4,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/services.dart';
 
 class Tflite {
-  static const MethodChannel _channel = const MethodChannel('tflite');
+  static const MethodChannel _channel = const MethodChannel('tflite2x');
 
   static Future<String?> loadModel(
       {required String model,
