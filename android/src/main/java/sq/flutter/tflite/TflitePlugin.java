@@ -214,7 +214,7 @@ public class TflitePlugin implements MethodCallHandler {
         return loadModel(args, true);
     }
 
-  private String loadModel(HashMap args, boolean objectDetector = false) throws IOException {
+  private String loadModel(HashMap args, boolean objectDetector) throws IOException {
     String model = args.get("model").toString();
     Object isAssetObj = args.get("isAsset");
     boolean isAsset = isAssetObj == null ? false : (boolean) isAssetObj;
