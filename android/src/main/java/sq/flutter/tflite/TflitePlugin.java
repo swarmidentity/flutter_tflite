@@ -207,14 +207,14 @@ public class TflitePlugin implements MethodCallHandler {
   }
 
     private String loadImageClassificationModel(HashMap args) throws IOException {
-        return loadModel(args, tfLiteImageClassification);
+        return loadModel(args, false);
     }
 
     private String loadObjectRecognitionModel(HashMap args) throws IOException {
-        return loadModel(args, tfLiteObjectRecognition);
+        return loadModel(args, true);
     }
 
-  private String loadModel(HashMap args, Interpreter tflite) throws IOException {
+  private String loadModel(HashMap args, boolean objectDetector = false) throws IOException {
     String model = args.get("model").toString();
     Object isAssetObj = args.get("isAsset");
     boolean isAsset = isAssetObj == null ? false : (boolean) isAssetObj;
@@ -249,7 +249,12 @@ public class TflitePlugin implements MethodCallHandler {
       GpuDelegate delegate = new GpuDelegate();
       tfliteOptions.addDelegate(delegate);
     }
-    tfLite = new Interpreter(buffer, tfliteOptions);
+    if (objectDetector) {
+      tfLiteObjectRecognition = new Interpreter(buffer, tfliteOptions);
+    }
+    else {
+      tfLiteImageClassification = new Interpreter(buffer, tfliteOptions);
+    }
 
     String labels = args.get("labels").toString();
 
