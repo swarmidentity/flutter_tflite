@@ -6,14 +6,32 @@ import 'package:flutter/services.dart';
 class Tflite {
   static const MethodChannel _channel = const MethodChannel('tflite2x');
 
-  static Future<String?> loadModel(
+  static Future<String?> loadImageClassificationModel(
       {required String model,
       String labels = "",
       int numThreads = 1,
       bool isAsset = true,
       bool useGpuDelegate = false}) async {
     return await _channel.invokeMethod(
-      'loadModel',
+      'loadImageClassificationModel',
+      {
+        "model": model,
+        "labels": labels,
+        "numThreads": numThreads,
+        "isAsset": isAsset,
+        'useGpuDelegate': useGpuDelegate
+      },
+    );
+  }
+
+  static Future<String?> loadObjectRecognitionModel(
+      {required String model,
+        String labels = "",
+        int numThreads = 1,
+        bool isAsset = true,
+        bool useGpuDelegate = false}) async {
+    return await _channel.invokeMethod(
+      'loadObjectRecognitionModel',
       {
         "model": model,
         "labels": labels,
