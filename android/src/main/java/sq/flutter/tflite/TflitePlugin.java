@@ -58,8 +58,10 @@ public class TflitePlugin implements MethodCallHandler {
   private Interpreter tfLiteImageClassification;
   private boolean tfLiteBusy = false;
   private int inputSize = 0;
-  private Vector<String> labels;
-  float[][] labelProb;
+  private Vector<String> objectRecognitionLabels;
+  private Vector<String> imageClassificationLabels;
+  float[][] objectRecognitionLabelProb;
+  float[][] imageClassificationLabelProb;
   private static final int BYTES_PER_CHANNEL = 4;
 
   String[] partNames = {
@@ -261,16 +263,16 @@ public class TflitePlugin implements MethodCallHandler {
     if (labels.length() > 0) {
       if (isAsset) {
         key = mRegistrar.lookupKeyForAsset(labels);
-        loadLabels(assetManager, key);
+        loadLabels(assetManager, key, objectDetector);
       } else {
-        loadLabels(null, labels);
+        loadLabels(null, labels, objectDetector);
       }
     }
 
     return "success";
   }
 
-  private void loadLabels(AssetManager assetManager, String path) {
+  private void loadLabels(AssetManager assetManager, String path,boolean objectDetector) {
     BufferedReader br;
     try {
       if (assetManager != null) {
@@ -279,18 +281,28 @@ public class TflitePlugin implements MethodCallHandler {
         br = new BufferedReader(new InputStreamReader(new FileInputStream(new File(path))));
       }
       String line;
-      labels = new Vector<>();
-      while ((line = br.readLine()) != null) {
-        labels.add(line);
+      if (objectDetector) {
+        objectRecognitionLabels = new Vector<>();
+        while ((line = br.readLine()) != null) {
+          objectRecognitionLabels.add(line);
+        }
+        objectRecognitionLabelProb = new float[1][objectRecognitionLabels.size()];
+        br.close();
       }
-      labelProb = new float[1][labels.size()];
-      br.close();
+      else {
+        imageClassificationLabels = new Vector<>();
+        while ((line = br.readLine()) != null) {
+          imageClassificationLabels.add(line);
+        }
+        imageClassificationLabelProb = new float[1][imageClassificationLabels.size()];
+        br.close();
+      }
     } catch (IOException e) {
       throw new RuntimeException("Failed to read label file", e);
     }
   }
 
-  private List<Map<String, Object>> GetTopN(int numResults, float threshold) {
+  private List<Map<String, Object>> GetTopN(int numResults, float threshold, boolean objectDetector) {
     PriorityQueue<Map<String, Object>> pq =
         new PriorityQueue<>(
             1,
@@ -300,6 +312,20 @@ public class TflitePlugin implements MethodCallHandler {
                 return Float.compare((float) rhs.get("confidence"), (float) lhs.get("confidence"));
               }
             });
+
+    Vector<String> labels;
+    if (objectDetector)
+      labels = objectRecognitionLabels;
+    else
+      labels = imageClassificationLabels;
+
+
+
+    float[][] labelProb;
+    if (objectDetector)
+      labelProb = objectRecognitionLabelProb;
+    else
+      labelProb = imageClassificationLabelProb;
 
     for (int i = 0; i < labels.size(); ++i) {
       float confidence = labelProb[0][i];
@@ -523,12 +549,12 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLiteImageClassification.run(input, labelProb);
+      tfLiteImageClassification.run(input, imageClassificationLabelProb);
     }
 
     protected void onRunTfliteDone() {
       Log.v("time", "Inference took " + (SystemClock.uptimeMillis() - startTime));
-      result.success(GetTopN(NUM_RESULTS, THRESHOLD));
+      result.success(GetTopN(NUM_RESULTS, THRESHOLD,false));
     }
   }
 
@@ -549,11 +575,11 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLiteImageClassification.run(imgData, labelProb);
+      tfLiteImageClassification.run(imgData, imageClassificationLabelProb);
     }
 
     protected void onRunTfliteDone() {
-      result.success(GetTopN(NUM_RESULTS, THRESHOLD));
+      result.success(GetTopN(NUM_RESULTS, THRESHOLD,false));
     }
   }
 
@@ -584,12 +610,12 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void runTflite() {
-      tfLiteImageClassification.run(imgData, labelProb);
+      tfLiteImageClassification.run(imgData, imageClassificationLabelProb);
     }
 
     protected void onRunTfliteDone() {
       Log.v("time", "Inference took " + (SystemClock.uptimeMillis() - startTime));
-      result.success(GetTopN(NUM_RESULTS, THRESHOLD));
+      result.success(GetTopN(NUM_RESULTS, THRESHOLD,false));
     }
   }
 
@@ -705,7 +731,7 @@ public class TflitePlugin implements MethodCallHandler {
       for (int i = 0; i < numDetections[0]; ++i) {
         if (outputScores[0][i] < threshold) continue;
 
-        String detectedClass = labels.get((int) outputClasses[0][i] + 1);
+        String detectedClass = objectRecognitionLabels.get((int) outputClasses[0][i] + 1);
 
         if (counters.get(detectedClass) == null) {
           counters.put(detectedClass, 1);
@@ -773,7 +799,7 @@ public class TflitePlugin implements MethodCallHandler {
       inputSize = tensor.shape()[1];
 
       this.gridSize = inputSize / blockSize;
-      this.numClasses = labels.size();
+      this.numClasses = objectRecognitionLabels.size();
       this.output = new float[1][gridSize][gridSize][(numClasses + 5) * numBoxesPerBlock];
     }
 
@@ -836,7 +862,7 @@ public class TflitePlugin implements MethodCallHandler {
               Map<String, Object> ret = new HashMap<>();
               ret.put("rect", rect);
               ret.put("confidenceInClass", confidenceInClass);
-              ret.put("detectedClass", labels.get(detectedClass));
+              ret.put("detectedClass", objectRecognitionLabels.get(detectedClass));
 
               pq.add(ret);
             }
@@ -1604,7 +1630,9 @@ public class TflitePlugin implements MethodCallHandler {
       tfLiteObjectRecognition.close();
     if (tfLiteImageClassification != null)
       tfLiteImageClassification.close();
-    labels = null;
-    labelProb = null;
+    objectRecognitionLabels = null;
+    objectRecognitionLabelProb = null;
+    imageClassificationLabels = null;
+    imageClassificationLabelProb = null;
   }
 }
