@@ -31,7 +31,8 @@
 #define LOG(x) std::cerr
 
 typedef void (^TfLiteStatusCallback)(TfLiteStatus);
-NSString* loadModel(NSObject<FlutterPluginRegistrar>* _registrar, NSDictionary* args);
+NSString* loadObjectRecognitionModel(NSObject<FlutterPluginRegistrar>* _registrar, NSDictionary* args);
+NSString* loadImageClassificationModel(NSObject<FlutterPluginRegistrar>* _registrar, NSDictionary* args);
 void runTflite(NSDictionary* args, TfLiteStatusCallback cb);
 void runModelOnImage(NSDictionary* args, FlutterResult result);
 void runModelOnBinary(NSDictionary* args, FlutterResult result);

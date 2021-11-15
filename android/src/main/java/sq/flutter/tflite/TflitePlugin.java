@@ -84,7 +84,7 @@ public class TflitePlugin implements MethodCallHandler {
   List<Integer> childToParentEdges = new ArrayList<>();
 
   public static void registerWith(Registrar registrar) {
-    final MethodChannel channel = new MethodChannel(registrar.messenger(), "tflite");
+    final MethodChannel channel = new MethodChannel(registrar.messenger(), "tflite2x");
     channel.setMethodCallHandler(new TflitePlugin(registrar));
   }
 

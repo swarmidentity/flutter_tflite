@@ -19,8 +19,8 @@ void main() {
     });
     log.clear();
   });
-  test('loadModel', () async {
-    await Tflite.loadModel(
+  test('loadObjectionRecognitionModel', () async {
+    await Tflite.loadObjectRecognitionModel(
       model: 'assets/mobilenet_v1_1.0_224.tflite',
       labels: 'assets/mobilenet_v1_1.0_224.txt',
       numThreads: 2,
@@ -31,7 +31,7 @@ void main() {
       log,
       <Matcher>[
         isMethodCall(
-          'loadModel',
+          'loadObjectRecognitionModel',
           arguments: <String, dynamic>{
             'model': 'assets/mobilenet_v1_1.0_224.tflite',
             'labels': 'assets/mobilenet_v1_1.0_224.txt',
