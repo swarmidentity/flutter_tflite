@@ -56,7 +56,8 @@ public class TflitePlugin implements MethodCallHandler {
   private final Registrar mRegistrar;
   private Interpreter tfLiteObjectRecognition;
   private Interpreter tfLiteImageClassification;
-  private boolean tfLiteBusy = false;
+  private boolean objectRecognitionBusy = false;
+  private boolean imageClassificationBusy = false;
   private int inputSize = 0;
   private Vector<String> objectRecognitionLabels;
   private Vector<String> imageClassificationLabels;
@@ -495,8 +496,8 @@ public class TflitePlugin implements MethodCallHandler {
     boolean asynch;
 
     TfliteTask(HashMap args, Result result) {
-      if (tfLiteBusy) throw new RuntimeException("Interpreter busy");
-      else tfLiteBusy = true;
+      if (objectRecognitionBusy) throw new RuntimeException("Interpreter busy Object Recognition");
+      else objectRecognitionBusy = true;
       Object asynch = args.get("asynch");
       this.asynch = asynch == null ? false : (boolean) asynch;
       this.result = result;
@@ -510,7 +511,7 @@ public class TflitePlugin implements MethodCallHandler {
       if (asynch) execute();
       else {
         runTflite();
-        tfLiteBusy = false;
+        objectRecognitionBusy = false;
         onRunTfliteDone();
       }
     }
@@ -521,12 +522,48 @@ public class TflitePlugin implements MethodCallHandler {
     }
 
     protected void onPostExecute(Void backgroundResult) {
-      tfLiteBusy = false;
+      objectRecognitionBusy = false;
       onRunTfliteDone();
     }
   }
 
-  private class RunModelOnImage extends TfliteTask {
+  private abstract class TFLiteImageClassificationTask extends AsyncTask<Void, Void, Void> {
+    Result result;
+    boolean asynch;
+
+    TFLiteImageClassificationTask(HashMap args, Result result) {
+      if (imageClassificationBusy) throw new RuntimeException("Interpreter busy");
+      else imageClassificationBusy = true;
+      Object asynch = args.get("asynch");
+      this.asynch = asynch == null ? false : (boolean) asynch;
+      this.result = result;
+    }
+
+    abstract void runTflite();
+
+    abstract void onRunTfliteDone();
+
+    public void executeTfliteTask() {
+      if (asynch) execute();
+      else {
+        runTflite();
+        imageClassificationBusy = false;
+        onRunTfliteDone();
+      }
+    }
+
+    protected Void doInBackground(Void... backgroundArguments) {
+      runTflite();
+      return null;
+    }
+
+    protected void onPostExecute(Void backgroundResult) {
+      imageClassificationBusy = false;
+      onRunTfliteDone();
+    }
+  }
+
+  private class RunModelOnImage extends TFLiteImageClassificationTask {
     int NUM_RESULTS;
     float THRESHOLD;
     ByteBuffer input;
@@ -558,7 +595,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
   }
 
-  private class RunModelOnBinary extends TfliteTask {
+  private class RunModelOnBinary extends TFLiteImageClassificationTask {
     int NUM_RESULTS;
     float THRESHOLD;
     ByteBuffer imgData;
@@ -583,7 +620,7 @@ public class TflitePlugin implements MethodCallHandler {
     }
   }
 
-  private class RunModelOnFrame extends TfliteTask {
+  private class RunModelOnFrame extends TFLiteImageClassificationTask {
     int NUM_RESULTS;
     float THRESHOLD;
     long startTime;
