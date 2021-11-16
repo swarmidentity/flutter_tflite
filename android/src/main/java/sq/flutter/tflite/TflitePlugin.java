@@ -377,8 +377,12 @@ public class TflitePlugin implements MethodCallHandler {
     return bitmapRaw;
   }
 
-  ByteBuffer feedInputTensor(Bitmap bitmapRaw, float mean, float std) throws IOException {
-    Tensor tensor = tfLiteObjectRecognition.getInputTensor(0);
+  ByteBuffer feedInputTensor(Bitmap bitmapRaw, float mean, float std, boolean objectRecognition) throws IOException {
+    Tensor tensor;
+    if (objectRecognition)
+      tensor = tfLiteObjectRecognition.getInputTensor(0);
+    else
+      tensor = tfLiteImageClassification.getInputTensor(0);
     int[] shape = tensor.shape();
     inputSize = shape[1];
     int inputChannels = shape[3];
@@ -436,14 +440,14 @@ public class TflitePlugin implements MethodCallHandler {
     return imgData;
   }
 
-  ByteBuffer feedInputTensorImage(String path, float mean, float std) throws IOException {
+  ByteBuffer feedInputTensorImage(String path, float mean, float std, boolean objectRecognition) throws IOException {
     InputStream inputStream = new FileInputStream(path.replace("file://", ""));
     Bitmap bitmapRaw = BitmapFactory.decodeStream(inputStream);
 
-    return feedInputTensor(bitmapRaw, mean, std);
+    return feedInputTensor(bitmapRaw, mean, std, objectRecognition);
   }
 
-  ByteBuffer feedInputTensorFrame(List<byte[]> bytesList, int imageHeight, int imageWidth, float mean, float std, int rotation) throws IOException {
+  ByteBuffer feedInputTensorFrame(List<byte[]> bytesList, int imageHeight, int imageWidth, float mean, float std, int rotation, boolean objectRecognition) throws IOException {
     ByteBuffer Y = ByteBuffer.wrap(bytesList.get(0));
     ByteBuffer U = ByteBuffer.wrap(bytesList.get(1));
     ByteBuffer V = ByteBuffer.wrap(bytesList.get(2));
@@ -470,7 +474,7 @@ public class TflitePlugin implements MethodCallHandler {
     matrix.postRotate(rotation);
     bitmapRaw = Bitmap.createBitmap(bitmapRaw, 0, 0, bitmapRaw.getWidth(), bitmapRaw.getHeight(), matrix, true);
 
-    return feedInputTensor(bitmapRaw, mean, std);
+    return feedInputTensor(bitmapRaw, mean, std, objectRecognition);
   }
 
   public Allocation renderScriptNV21ToRGBA888(Context context, int width, int height, byte[] nv21) {
@@ -582,7 +586,7 @@ public class TflitePlugin implements MethodCallHandler {
       THRESHOLD = (float) threshold;
 
       startTime = SystemClock.uptimeMillis();
-      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
+      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD, false);
     }
 
     protected void runTflite() {
@@ -643,7 +647,7 @@ public class TflitePlugin implements MethodCallHandler {
 
       startTime = SystemClock.uptimeMillis();
 
-      imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
+      imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation, false);
     }
 
     protected void runTflite() {
@@ -670,7 +674,7 @@ public class TflitePlugin implements MethodCallHandler {
     int NUM_BOXES_PER_BLOCK = (int) args.get("numBoxesPerBlock");
     int NUM_RESULTS_PER_CLASS = (int) args.get("numResultsPerClass");
 
-    ByteBuffer imgData = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
+    ByteBuffer imgData = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD, true);
 
     if (model.equals("SSDMobileNet")) {
       new RunSSDMobileNet(args, imgData, NUM_RESULTS_PER_CLASS, THRESHOLD, result).executeTfliteTask();
@@ -716,7 +720,7 @@ public class TflitePlugin implements MethodCallHandler {
     int BLOCK_SIZE = (int) args.get("blockSize");
     int NUM_BOXES_PER_BLOCK = (int) args.get("numBoxesPerBlock");
 
-    ByteBuffer imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
+    ByteBuffer imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation, true);
 
     if (model.equals("SSDMobileNet")) {
       new RunSSDMobileNet(args, imgData, NUM_RESULTS_PER_CLASS, THRESHOLD, result).executeTfliteTask();
@@ -946,7 +950,7 @@ public class TflitePlugin implements MethodCallHandler {
 
       outputType = args.get("outputType").toString();
       startTime = SystemClock.uptimeMillis();
-      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
+      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD, true);
       output = ByteBuffer.allocateDirect(input.limit());
       output.order(ByteOrder.nativeOrder());
       if (input.limit() == 0) {
@@ -1040,7 +1044,7 @@ public class TflitePlugin implements MethodCallHandler {
 
       outputType = args.get("outputType").toString();
       startTime = SystemClock.uptimeMillis();
-      input = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
+      input = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation, true);
       output = ByteBuffer.allocateDirect(input.limit());
       output.order(ByteOrder.nativeOrder());
 
@@ -1095,7 +1099,7 @@ public class TflitePlugin implements MethodCallHandler {
       outputType = args.get("outputType").toString();
 
       startTime = SystemClock.uptimeMillis();
-      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
+      input = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD, true);
       output = ByteBuffer.allocateDirect(tfLiteObjectRecognition.getOutputTensor(0).numBytes());
       output.order(ByteOrder.nativeOrder());
     }
@@ -1182,7 +1186,7 @@ public class TflitePlugin implements MethodCallHandler {
       outputType = args.get("outputType").toString();
 
       startTime = SystemClock.uptimeMillis();
-      input = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
+      input = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation, true);
       output = ByteBuffer.allocateDirect(tfLiteObjectRecognition.getOutputTensor(0).numBytes());
       output.order(ByteOrder.nativeOrder());
     }
@@ -1297,7 +1301,7 @@ public class TflitePlugin implements MethodCallHandler {
     double threshold = (double) args.get("threshold");
     int nmsRadius = (int) args.get("nmsRadius");
 
-    ByteBuffer imgData = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD);
+    ByteBuffer imgData = feedInputTensorImage(path, IMAGE_MEAN, IMAGE_STD, true);
 
     new RunPoseNet(args, imgData, numResults, threshold, nmsRadius, result).executeTfliteTask();
   }
@@ -1326,7 +1330,7 @@ public class TflitePlugin implements MethodCallHandler {
     double threshold = (double) args.get("threshold");
     int nmsRadius = (int) args.get("nmsRadius");
 
-    ByteBuffer imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation);
+    ByteBuffer imgData = feedInputTensorFrame(bytesList, imageHeight, imageWidth, IMAGE_MEAN, IMAGE_STD, rotation, true);
 
     new RunPoseNet(args, imgData, numResults, threshold, nmsRadius, result).executeTfliteTask();
   }
